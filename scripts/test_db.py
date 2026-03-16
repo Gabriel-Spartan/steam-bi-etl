@@ -1,28 +1,15 @@
-import os
-from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
+# scripts/test_db.py
+import sys
+import logging
+from pathlib import Path
 
-def main():
-    # Carga variables desde .env (DATABASE_URL)
-    load_dotenv()
+# Asegura que src/ sea importable desde scripts/
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-    db_url = os.getenv("DATABASE_URL")
-    if not db_url:
-        raise RuntimeError("DATABASE_URL no está definido en el archivo .env")
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-    # Crea el engine de SQLAlchemy
-    engine = create_engine(db_url, future=True)
-
-    # Prueba conexión
-    with engine.connect() as conn:
-        now = conn.execute(text("SELECT now();")).scalar_one()
-        user = conn.execute(text("SELECT current_user;")).scalar_one()
-        db = conn.execute(text("SELECT current_database();")).scalar_one()
-
-    print("✅ Conexión OK")
-    print("Usuario:", user)
-    print("Base de datos:", db)
-    print("Hora del servidor:", now)
+from src.db import check_connection
 
 if __name__ == "__main__":
-    main()
+    ok = check_connection()
+    sys.exit(0 if ok else 1)

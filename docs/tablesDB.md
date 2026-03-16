@@ -1,63 +1,9 @@
-Tablas que puedes tener “por el momento” (mercado + sin depender de steamid)
-1) dim_game_min (mínima)
+# Notas rápidas de implementación:
 
-Fuente: IStoreService/GetAppList
-Campos mínimos recomendados:
+`fact_game_achievement_summary` es calculada en pipeline, no extraída directa.
 
-game_key (PK surrogate)
+`fact_user_owned_game` y `fact_user_recent_play` son tablas de snapshot, así que define desde el principio si harás inserción por fecha o deduplicación por llave compuesta.
 
-appid (natural key)
+`supported_languages_raw` queda bien como deuda técnica de v1; en v2 puedes normalizarla a `dim_language` + `bridge_game_language`.
 
-name
-
-last_modified (timestamp)
-
-price_change_number
-
-Uso BI: catálogo base + control de cambios (saber qué app cambió y volver a consultar otras fuentes).
-
-2) fact_concurrent_players_snapshot
-
-Fuente: ISteamUserStats/GetNumberOfCurrentPlayers (appid → player_count)
-Mejor grano recomendado:
-
-1 fila por appid por “instante de captura” (timestamp).
-Es decir: appid + captured_at como clave única.
-
-Columnas:
-
-appid
-
-captured_at (timestamp)
-
-player_count
-
-¿Por hora o por día?
-
-Lo ideal es por hora (te da curva diaria real).
-
-Luego agregas en OLAP a por día con AVG/MAX/MIN (ej. pico diario = MAX).
-Así no pierdes información.
-
-3) fact_news_events (opcional)
-
-Fuente: ISteamNews/GetNewsForApp (no requiere steamid; requiere appid)
-Grano recomendado:
-
-1 fila por noticia/post (por gid o id que venga en la respuesta).
-
-Columnas típicas:
-
-appid
-
-news_id / gid
-
-date_published
-
-title
-
-feedlabel / tags (si vienen)
-
-url
-
-Uso BI: explicar picos o caídas: “hubo update/announcement” vs “subieron jugadores”.
+`fact_game_review_detail.author_last_played` podría bajarse a DATE si quieres más anonimización y menos granularidad.

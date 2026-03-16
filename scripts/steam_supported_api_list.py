@@ -15,12 +15,11 @@ def main():
     data = r.json()
     interfaces = data["apilist"]["interfaces"]
 
-    print(f"✅ Interfaces encontradas: {len(interfaces)}\n")
+    print(f"Interfaces encontradas: {len(interfaces)}\n")
     i = 1
     for iface in interfaces:
         print(f"{i}. {iface['name']}")
         i += 1
-    print("\n(Se imprimieron las primeras 20. Si quieres, lo guardamos en Postgres.)")
 
 if __name__ == "__main__":
     main()

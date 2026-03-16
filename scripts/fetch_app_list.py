@@ -16,7 +16,7 @@ def fetch_app_list():
         "include_software": "false",
         "include_videos": "false",
         "include_hardware": "false",
-        "max_results": 50000,   # puedes bajar si quieres probar rápido
+        "max_results": 50000,
         "format": "json"
     }
 
