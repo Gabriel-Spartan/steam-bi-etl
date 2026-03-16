@@ -92,7 +92,7 @@ https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-
 
 ### 1. Clonar el repositorio
 ```bash
-git clone https://github.com/TU_USUARIO/steam-bi-etl.git
+git clone https://github.com/Gabriel-Spartan/steam-bi-etl.git
 cd steam-bi-etl
 ```
 
@@ -141,8 +141,6 @@ STEAM_API_KEY_5=
 STEAM_COUNTRY=EC
 STEAM_LANG=spanish
 ```
-
-> **Importante:** el archivo `.env` está en `.gitignore` y nunca debe subirse al repositorio.
 
 Para obtener tu `STEAM_API_KEY` visita: https://steamcommunity.com/dev/apikey  
 Tu `STEAM_ID64` lo puedes encontrar en: https://steamid.io
