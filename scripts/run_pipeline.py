@@ -95,10 +95,10 @@ def run_step(name: str, module_path: str, func_name: str) -> bool:
         module = importlib.import_module(module_path)
         func   = getattr(module, func_name)
         func()
-        logger.info(f"✅ {name} completado.\n")
+        logger.info(f"{name} completado.\n")
         return True
     except Exception as e:
-        logger.error(f"❌ {name} falló: {e}", exc_info=True)
+        logger.error(f"{name} falló: {e}", exc_info=True)
         return False
 
 
@@ -165,7 +165,7 @@ def main():
         logger.warning(f"\nPipeline completado con errores en: {', '.join(failed)}")
         sys.exit(1)
     else:
-        logger.info("\n✅ Pipeline completado exitosamente.")
+        logger.info("\nPipeline completado exitosamente.")
 
 
 if __name__ == "__main__":

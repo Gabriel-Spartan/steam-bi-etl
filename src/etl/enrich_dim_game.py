@@ -42,6 +42,7 @@ _API_KEYS = [
         settings.steam_api_key_3,
         settings.steam_api_key_4,
         settings.steam_api_key_5,
+        settings.steam_api_key_6,
     ]
     if k
 ]
@@ -148,7 +149,7 @@ def extract_enriched_fields(data: dict) -> dict:
     platforms    = data.get("platforms", {})
 
     return {
-        "game_name":           (data.get("name") or "").strip()[:255] or None,
+        "game_name":           (data.get("name") or "").strip()[:255] or "Unknown",
         "game_type":           (data.get("type") or "").strip()[:50] or None,
         "required_age":        int(data.get("required_age") or 0),
         "is_free":             1 if data.get("is_free") else 0,
@@ -246,6 +247,11 @@ def has_changed(current_row, new_fields: dict) -> bool:
     for field in SCD2_FIELDS:
         db_val  = getattr(current_row, field, None)
         new_val = new_fields.get(field)
+
+        # Si el nuevo valor es None o vacío, no considerar como cambio
+        if new_val is None or new_val == "":
+            continue
+
         if isinstance(db_val, bool):
             db_val = 1 if db_val else 0
         if isinstance(db_val, str):

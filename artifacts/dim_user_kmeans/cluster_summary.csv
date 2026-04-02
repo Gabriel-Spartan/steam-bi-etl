@@ -1,0 +1,5 @@
+cluster_id,cluster_size,known_country_rows,blank_country_rows,dominant_country_key,dominant_country_iso,dominant_country_name,dominant_currency_code,dominant_country_currency,dominant_share_known
+0,1168,1028,140,29,BR,Brasil,USD,US_USD,0.0204
+1,10917,7481,3436,197,RU,Rusia,USD,EC_USD,0.1545
+2,814,785,29,69,US,Estados Unidos,USD,US_USD,0.9134
+3,1303,1303,0,69,US,Estados Unidos,USD,US_USD,0.9923

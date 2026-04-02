@@ -32,6 +32,7 @@ _API_KEYS = [
         settings.steam_api_key_3,
         settings.steam_api_key_4,
         settings.steam_api_key_5,
+        settings.steam_api_key_6,
     ]
     if k
 ]

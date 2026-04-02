@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     steam_api_key_3: str = ""  # opcional
     steam_api_key_4: str = ""  # opcional
     steam_api_key_5: str = ""  # opcional
+    steam_api_key_6: str = ""  # opcional
     steam_id64: str
     game_id: int = Field(alias="GAME_ID", default=1030300)
     steam_country: str = "EC"

@@ -45,18 +45,19 @@ def _atomic_save(path: Path, data) -> None:
         raise
 
 
-def load_progress() -> set:
-    if not PROGRESS_PATH.exists() or PROGRESS_PATH.stat().st_size == 0:
+def load_progress(path: Path | None = None) -> set:
+    p = path or PROGRESS_PATH
+    if not p.exists() or p.stat().st_size == 0:
         return set()
     try:
-        with open(PROGRESS_PATH, "r", encoding="utf-8") as f:
+        with open(p, "r", encoding="utf-8") as f:
             return set(json.load(f).get("done_appids", []))
     except json.JSONDecodeError:
         return set()
 
 
-def save_progress(done: set) -> None:
-    _atomic_save(PROGRESS_PATH, {"done_appids": list(done)})
+def save_progress(done: set, path: Path | None = None) -> None:
+    _atomic_save(path or PROGRESS_PATH, {"done_appids": list(done)})
 
 
 # ── SQL ───────────────────────────────────────────────────────────────────────
@@ -102,19 +103,15 @@ SQL_INSERT = text("""
 
 # ── API ───────────────────────────────────────────────────────────────────────
 
-def get_price(appid: int, retry: bool = True) -> dict | None:
-    """
-    Obtiene price_overview de un juego para el país configurado.
-    Devuelve None si el juego es F2P, no tiene precio o hay error.
-    """
+def get_price(appid: int, country_code: str = "ec", retry: bool = True) -> dict | None:
     try:
         r = requests.get(
             DETAILS_URL,
             params={
-                "appids": appid,
-                "cc":     settings.steam_country,
-                "l":      settings.steam_lang,
-                "filters": "price_overview",  # solo trae price_overview, más rápido
+                "appids":  appid,
+                "cc":      country_code,
+                "l":       "english",
+                "filters": "price_overview",
             },
             timeout=15,
         )
@@ -123,7 +120,7 @@ def get_price(appid: int, retry: bool = True) -> dict | None:
             if retry:
                 logger.warning(f"  429 appid {appid}, esperando {DELAY_ON_429}s...")
                 time.sleep(DELAY_ON_429)
-                return get_price(appid, retry=False)
+                return get_price(appid, country_code, retry=False)
             return None
 
         if r.status_code in (400, 403, 404):
@@ -136,13 +133,18 @@ def get_price(appid: int, retry: bool = True) -> dict | None:
         if not app_data.get("success"):
             return None
 
-        return app_data.get("data", {}).get("price_overview")
+        # Fix: data puede ser lista en algunos casos
+        game_data = app_data.get("data", {})
+        if not isinstance(game_data, dict):
+            return None
+
+        return game_data.get("price_overview")
 
     except requests.exceptions.ConnectionError:
         logger.warning(f"  Error de red appid {appid}, esperando 15s...")
         time.sleep(15)
         if retry:
-            return get_price(appid, retry=False)
+            return get_price(appid, country_code, retry=False)
         return None
 
     except requests.RequestException as e:
@@ -152,10 +154,15 @@ def get_price(appid: int, retry: bool = True) -> dict | None:
 
 # ── Load ──────────────────────────────────────────────────────────────────────
 
-def load() -> None:
-    run_id   = start_etl_run("load_fact_game_price_snapshot")
-    inserted = 0
-    skipped  = 0
+def load(country_code: str | None = None) -> None:
+    # Usar el país pasado como parámetro o el del .env
+    cc         = country_code or settings.steam_country.lower()
+    run_id     = start_etl_run(f"load_fact_game_price_snapshot_{cc.upper()}")
+    inserted   = 0
+    skipped    = 0
+
+    # Archivo de progreso por país
+    progress_path = Path(__file__).resolve().parents[2] / "data" / "cache" / f"price_progress_{cc.upper()}.json"
 
     try:
         # Paso 1: appids de bibliotecas
@@ -174,7 +181,7 @@ def load() -> None:
             # country_key para el país configurado en .env
             country_row = session.execute(
                 SQL_GET_COUNTRY_KEY,
-                {"iso_code": settings.steam_country.upper()}
+                {"iso_code": cc.upper()}
             ).fetchone()
             country_key = country_row.country_key if country_row else None
 
@@ -187,7 +194,7 @@ def load() -> None:
         logger.info(f"  country_key para {settings.steam_country}: {country_key}")
 
         # Paso 3: filtrar pendientes
-        done_appids = load_progress()
+        done_appids = load_progress(progress_path)
         pending     = [a for a in appids if a not in done_appids]
         logger.info(
             f"  Ya procesados: {len(done_appids):,} | "
@@ -214,7 +221,7 @@ def load() -> None:
                 done_appids.add(appid)
                 continue
 
-            price = get_price(appid)
+            price = get_price(appid, cc)
 
             if not price:
                 skipped += 1
@@ -263,7 +270,7 @@ def load() -> None:
 
             # Checkpoint cada 500
             if i % CHECKPOINT_EVERY == 0:
-                save_progress(done_appids)
+                save_progress(done_appids, progress_path)
                 logger.info(
                     f"  [{i:,}/{len(pending):,}] "
                     f"insertados={inserted:,} skip={skipped:,}"
@@ -278,7 +285,7 @@ def load() -> None:
             inserted += len(batch)
 
         # Checkpoint final
-        save_progress(done_appids)
+        save_progress(done_appids, progress_path)
 
         finish_etl_run(
             run_id, status="success",
@@ -297,5 +304,30 @@ def load() -> None:
 
 
 if __name__ == "__main__":
+    import argparse
     logging.basicConfig(level=logging.INFO, format="%(asctime)s — %(message)s")
-    load()
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--country", type=str, default=None,
+                        help="Código ISO del país (ej: US, AR, MX). Por defecto usa STEAM_COUNTRY del .env")
+    parser.add_argument("--all-countries", action="store_true",
+                        help="Ejecuta para todos los países de dim_country")
+    args = parser.parse_args()
+
+    if args.all_countries:
+        # Obtener todos los países de dim_country que Steam soporta
+        from src.db import get_session
+        from sqlalchemy import text
+        with get_session() as session:
+            rows = session.execute(text(
+                "SELECT iso_code FROM dim_country ORDER BY iso_code"
+            )).fetchall()
+        countries = [r.iso_code.lower() for r in rows if r.iso_code]
+        logger.info(f"Ejecutando para {len(countries)} países...")
+        for cc in countries:
+            logger.info(f"\n{'='*40}\nPaís: {cc.upper()}\n{'='*40}")
+            load(country_code=cc)
+    elif args.country:
+        load(country_code=args.country.lower())
+    else:
+        load()

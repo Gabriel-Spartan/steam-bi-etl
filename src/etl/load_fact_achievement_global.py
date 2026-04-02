@@ -22,12 +22,27 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 GLOBAL_ACH_URL   = "https://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/"
-DELAY_BETWEEN    = 1.0
+DELAY_BETWEEN    = 0.5
 DELAY_ON_429     = 30
 CHECKPOINT_EVERY = 200
 
 PROGRESS_PATH = Path(__file__).resolve().parents[2] / "data" / "cache" / "achievement_global_progress.json"
 
+
+_API_KEYS = [
+    k for k in [
+        settings.steam_api_key,
+        settings.steam_api_key_2,
+        settings.steam_api_key_3,
+        settings.steam_api_key_4,
+        settings.steam_api_key_5,
+        settings.steam_api_key_6,
+    ]
+    if k
+]
+
+def _get_key(n: int) -> str:
+    return _API_KEYS[n % len(_API_KEYS)]
 
 # ── Progreso ──────────────────────────────────────────────────────────────────
 
@@ -113,10 +128,7 @@ def get_global_percentages(appid: int, retry: bool = True) -> list[dict] | None:
     try:
         r = requests.get(
             GLOBAL_ACH_URL,
-            params={
-                "gameid": appid,
-                "format": "json",
-            },
+            params={"gameid": appid, "format": "json"},
             timeout=15,
         )
 
@@ -169,7 +181,7 @@ def load() -> None:
         if total == 0:
             logger.warning("  dim_achievement está vacía. Ejecuta load_dim_achievement primero.")
             finish_etl_run(run_id, status="failed",
-                           error_message="dim_achievement vacía")
+                            error_message="dim_achievement vacía")
             return
 
         # Paso 2: filtrar pendientes
@@ -189,12 +201,15 @@ def load() -> None:
         date_key = int(datetime.now().strftime("%Y%m%d"))
         batch    = []
 
+        req_counter = 0
+
         for i, game_row in enumerate(pending, 1):
             appid    = game_row.appid
             game_key = game_row.game_key
 
             # Obtener porcentajes globales de la API
-            percentages = get_global_percentages(appid)
+            percentages = get_global_percentages(appid, req_counter)
+            req_counter += 1
 
             if not percentages:
                 skipped += 1

@@ -27,6 +27,7 @@ DELAY_BETWEEN    = 1.5
 DELAY_ON_429     = 60
 CHECKPOINT_EVERY = 200
 REVIEWS_PER_APP  = 100   # máximo por llamada
+MAX_INT = 2_147_483_647
 
 PROGRESS_PATH = Path(__file__).resolve().parents[2] / "data" / "cache" / "review_detail_progress.json"
 
@@ -191,12 +192,7 @@ def ts_to_datetime(ts: int):
     return datetime.fromtimestamp(ts)
 
 
-def parse_review(
-    review: dict,
-    game_key: int,
-    language_map: dict,
-    run_id: int,
-) -> dict | None:
+def parse_review(review, game_key, language_map, run_id):
     rec_id = str(review.get("recommendationid", "")).strip()
     if not rec_id:
         return None
@@ -204,6 +200,13 @@ def parse_review(
     author       = review.get("author", {})
     language_str = review.get("language", "").strip().lower()
     language_key = language_map.get(language_str)
+
+    def safe_int(val, max_val=MAX_INT) -> int:
+        """Convierte a int limitando al máximo de INT de SQL Server."""
+        try:
+            return min(int(val or 0), max_val)
+        except (ValueError, TypeError):
+            return 0
 
     return {
         "recommendation_id":           rec_id[:50],
@@ -213,19 +216,19 @@ def parse_review(
         "language_key":                language_key,
         "review_text":                 (review.get("review") or "").strip(),
         "voted_up":                    1 if review.get("voted_up") else 0,
-        "votes_up":                    review.get("votes_up", 0),
-        "votes_funny":                 review.get("votes_funny", 0),
+        "votes_up":                    safe_int(review.get("votes_up")),
+        "votes_funny":                 safe_int(review.get("votes_funny")),
         "weighted_vote_score":         float(review.get("weighted_vote_score", 0)),
-        "comment_count":               review.get("comment_count", 0),
+        "comment_count":               safe_int(review.get("comment_count")),
         "steam_purchase":              1 if review.get("steam_purchase") else 0,
         "received_for_free":           1 if review.get("received_for_free") else 0,
         "refunded":                    1 if review.get("refunded") else 0,
         "written_during_early_access": 1 if review.get("written_during_early_access") else 0,
         "primarily_steam_deck":        1 if review.get("primarily_steam_deck") else 0,
-        "author_playtime_forever":     author.get("playtime_forever", 0),
-        "author_playtime_last_two_weeks": author.get("playtime_last_two_weeks", 0),
-        "author_playtime_at_review":   author.get("playtime_at_review", 0),
-        "author_last_played":          ts_to_datetime(author.get("last_played")),
+        "author_playtime_forever":          safe_int(author.get("playtime_forever")),
+        "author_playtime_last_two_weeks":   safe_int(author.get("playtime_last_two_weeks")),
+        "author_playtime_at_review":        safe_int(author.get("playtime_at_review")),
+        "author_last_played":               ts_to_datetime(author.get("last_played")),
         "etl_run_id":                  run_id,
     }
 
